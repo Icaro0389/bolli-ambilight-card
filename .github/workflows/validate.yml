@@ -1,0 +1,16 @@
+name: Validate card
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: node --check bolli-ambilight-card.js
+      - name: Check HACS manifest
+        run: node -e "const h=require('./hacs.json');if(h.filename!=='bolli-ambilight-card.js')process.exit(1)"
