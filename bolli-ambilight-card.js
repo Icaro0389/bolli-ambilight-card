@@ -1,5 +1,5 @@
-/* Bolli Ambilight Card — Home Assistant custom card, v0.2.1 */
-const BOLLI_VERSION = '0.2.1';
+/* Bolli Ambilight Card — Home Assistant custom card, v0.2.2 */
+const BOLLI_VERSION = '0.2.2';
 const BOLLI_DEFAULTS = {
   power: 'switch.bolli_ambilight_power', mode: 'select.bolli_ambilight_mode',
   status: 'sensor.bolli_ambilight_status', fps: 'sensor.bolli_ambilight_actual_fps',
@@ -102,6 +102,23 @@ class BolliAmbilightCard extends HTMLElement {
       .sliderline strong,.toggle input{flex-shrink:0}
       .preview img{min-width:0;max-width:100%}
       .stat{min-width:0;overflow-wrap:anywhere}
+    /* Use a single vertical flex layout, independent of intrinsic grid sizing. */
+      :host{display:block;width:100%;min-width:0;max-width:100%;contain:inline-size}
+      ha-card{display:block;width:100%;min-width:0;max-width:100%}
+      .wrap{display:flex;flex-direction:column;align-items:stretch;container-type:normal;width:auto;min-width:0;max-width:100%;padding:14px}
+      .wrap>*{width:100%;min-width:0;max-width:100%}
+      .controls,details .inside,.slider{display:flex;flex-direction:column;align-items:stretch;min-width:0;width:100%;max-width:100%}
+      details{display:block;width:100%;min-width:0;max-width:100%}
+      details:not([open])>.inside{display:none}
+      .selectrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;min-width:0;width:100%}
+      .selectrow select{display:block;flex:1 1 120px;width:0;min-width:0;max-width:100%}
+      .preview{width:100%;min-width:0;aspect-ratio:16/9}
+      .preview img{width:100%;height:100%;min-width:0;max-width:100%;object-fit:contain}
+      .sliderline{min-width:0;width:100%}
+      .slider input[type=range]{width:100%;min-width:0;max-width:100%}
+      .mode,.stat{min-width:0;padding-inline:4px}
+      .head .heading{min-width:0;flex:1 1 0}
+      .power{flex:none}
     </style><ha-card><div class="wrap">
       <div class="head"><div class="glyph"><ha-icon icon="mdi:television-classic"></ha-icon></div><div class="heading"><div class="name"></div><div class="sub"></div></div><button class="power" data-action="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       <div class="preview"></div><div class="stats"></div><div class="modes"></div><div class="controls"></div><details><summary>Calibrazione HyperHDR</summary><div class="inside calibration"></div></details><details><summary>Diagnostica</summary><div class="inside diagnostic"></div></details><div class="notice" role="alert"></div><div class="meta line"></div>
