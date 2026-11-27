@@ -1,5 +1,5 @@
-/* Bolli Ambilight Card — Home Assistant custom card, v0.2.2 */
-const BOLLI_VERSION = '0.2.2';
+/* Bolli Ambilight Card — Home Assistant custom card, v0.2.3 */
+const BOLLI_VERSION = '0.2.3';
 const BOLLI_DEFAULTS = {
   power: 'switch.bolli_ambilight_power', mode: 'select.bolli_ambilight_mode',
   status: 'sensor.bolli_ambilight_status', fps: 'sensor.bolli_ambilight_actual_fps',
@@ -111,7 +111,7 @@ class BolliAmbilightCard extends HTMLElement {
       details{display:block;width:100%;min-width:0;max-width:100%}
       details:not([open])>.inside{display:none}
       .selectrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;min-width:0;width:100%}
-      .selectrow select{display:block;flex:1 1 120px;width:0;min-width:0;max-width:100%}
+      .selectrow select{display:block;flex:0 1 140px;width:140px;min-width:0;max-width:45%;margin-inline-start:auto}
       .preview{width:100%;min-width:0;aspect-ratio:16/9}
       .preview img{width:100%;height:100%;min-width:0;max-width:100%;object-fit:contain}
       .sliderline{min-width:0;width:100%}
