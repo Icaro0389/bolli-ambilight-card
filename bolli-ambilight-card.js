@@ -1,5 +1,5 @@
-/* Bolli Ambilight Card — Home Assistant custom card, v0.1.1 */
-const BOLLI_VERSION = '0.1.1';
+/* Bolli Ambilight Card — Home Assistant custom card, v0.2.0 */
+const BOLLI_VERSION = '0.2.0';
 const BOLLI_DEFAULTS = {
   power: 'switch.bolli_ambilight_power', mode: 'select.bolli_ambilight_mode',
   status: 'sensor.bolli_ambilight_status', fps: 'sensor.bolli_ambilight_actual_fps',
@@ -10,6 +10,12 @@ const BOLLI_DEFAULTS = {
   target: 'number.bolli_ambilight_target_fps',
   auto: 'switch.bolli_ambilight_auto_brightness',
   camera: 'camera.tv_ambilight_led_preview',
+  lux:'sensor.zigbee2cube_1001e0b3e4_illuminance', tv:'media_player.samsung_q60_series',
+  leds:'sensor.tv_ambilight_led_count', source:'sensor.tv_ambilight_visible_priority',
+  gamma:'number.tv_ambilight_gamma', saturation:'number.tv_ambilight_saturation_gain',
+  luminance:'number.tv_ambilight_luminance_gain', threshold:'number.tv_ambilight_backlight_threshold',
+  smoothing:'switch.tv_ambilight_smoothing', border:'switch.tv_ambilight_blackborder_detection',
+  hdr:'select.tv_ambilight_hdr_tone_mapping', priority:'select.tv_ambilight_priority_source',
 };
 const BOLLI_LABELS = {
   it: { ready:'Connesso a HyperHDR', offline:'HyperHDR non disponibile', power:'Accensione', cinema:'Cinema', relax:'Relax', off:'Off', auto:'Auto', brightness:'Luminosità', temperature:'Temperatura', fps:'FPS desiderati', ambient:'Luminosità automatica', preview:'Anteprima LED', status:'Stato', missing:'Entità non disponibile' },
@@ -20,14 +26,14 @@ const bolliEscape = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 class BolliAmbilightCard extends HTMLElement {
   static getStubConfig() { return { type: 'custom:bolli-ambilight-card', name: 'Bolli Ambilight', show_preview: false }; }
   static getConfigElement() { return document.createElement('bolli-ambilight-card-editor'); }
-  constructor() { super(); this.attachShadow({mode:'open'}); this._events = false; }
+  constructor() { super(); this.attachShadow({mode:'open'}); this._events = false; this._pending = new Map(); this._drag = null; }
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('Configurazione non valida');
     this._config = { show_preview:false, name:'Bolli Ambilight', ...config };
     this._ids = Object.fromEntries(Object.keys(BOLLI_DEFAULTS).map(k => [k, this._config[`${k}_entity`] || BOLLI_DEFAULTS[k]]));
     this._build();
   }
-  connectedCallback(){ if(!this._cameraTimer)this._cameraTimer=setInterval(()=>this._updateCamera(),1000); }
+  connectedCallback(){ if(!this._cameraTimer)this._cameraTimer=setInterval(()=>{this._updateCamera();if(this._pending.size)this._update();},1000); }
   disconnectedCallback(){clearInterval(this._cameraTimer);this._cameraTimer=null;}
   getCardSize() { return this._config?.show_preview ? 7 : 5; }
   getGridOptions() { return { columns:12, min_columns:6 }; }
@@ -68,9 +74,22 @@ class BolliAmbilightCard extends HTMLElement {
       .preview img{display:block;width:100%;max-height:210px;object-fit:contain}.preview.show{display:flex;aspect-ratio:16/9;background:#000}.preview.black img{visibility:hidden}
       @container(max-width:315px){.mode{font-size:11px}.wrap{padding:12px;gap:12px}.modes{gap:4px}}
       @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+      :host{--bolli-accent:var(--primary-color,#38bde5)}
+      ha-card{border-radius:22px;background:linear-gradient(145deg,color-mix(in srgb,var(--card-background-color) 94%,#64748b),var(--card-background-color));border:1px solid var(--divider-color)}
+      .wrap{gap:12px;padding:14px}.glyph{width:36px;height:36px;border-radius:12px}.power{width:38px;height:38px}
+      .mode{height:48px;border:1px solid color-mix(in srgb,var(--secondary-text-color) 22%,transparent);--mode-color:#9b83df}
+      .mode[data-value="Cinema"]{--mode-color:#38bde5}.mode[data-value="Relax"]{--mode-color:#d8a456}.mode[data-value="Off"]{--mode-color:#e87988}
+      .mode.selected{color:var(--mode-color);background:color-mix(in srgb,var(--mode-color) 16%,transparent);box-shadow:inset 0 0 0 1px var(--mode-color)}
+      .preview img{max-height:none;aspect-ratio:16/9;object-fit:contain}.preview{position:relative}
+      .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.stat{background:color-mix(in srgb,var(--secondary-text-color) 7%,transparent);border:1px solid var(--divider-color);border-radius:10px;padding:9px;text-align:center}.stat b{display:block;font-size:16px}.stat small{font-size:10px;color:var(--secondary-text-color)}
+      .controls{gap:8px}.slider{gap:2px}.sliderline{font-size:12px}.sliderline strong{font-size:12px}.slider input{height:18px;accent-color:var(--bolli-accent)}
+      .section{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--secondary-text-color);margin:4px 0}
+      details{border:1px solid var(--divider-color);border-radius:11px;padding:10px;background:color-mix(in srgb,var(--secondary-text-color) 4%,transparent)}summary{cursor:pointer;font-size:13px;font-weight:500}details .inside{display:grid;gap:10px;margin-top:12px}
+      .toggle input{appearance:none;width:34px;height:19px;border-radius:20px;background:var(--disabled-color,#777);position:relative;cursor:pointer}.toggle input:checked{background:var(--bolli-accent)}.toggle input:before{content:'';position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:white}.toggle input:checked:before{left:18px}
+      .toggle{font-size:12px}.selectrow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}.selectrow select{max-width:55%;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:5px}.notice{font-size:12px;color:var(--error-color);overflow-wrap:anywhere}.notice:empty{display:none}.diagnostic{font-size:12px;overflow-wrap:anywhere;color:var(--secondary-text-color)}
     </style><ha-card><div class="wrap">
       <div class="head"><div class="glyph"><ha-icon icon="mdi:television-classic"></ha-icon></div><div class="heading"><div class="name"></div><div class="sub"></div></div><button class="power" data-action="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
-      <div class="modes"></div><div class="controls"></div><div class="preview"></div><div class="meta line"></div>
+      <div class="preview"></div><div class="stats"></div><div class="modes"></div><div class="controls"></div><details><summary>Calibrazione HyperHDR</summary><div class="inside calibration"></div></details><details><summary>Diagnostica</summary><div class="inside diagnostic"></div></details><div class="notice" role="alert"></div><div class="meta line"></div>
     </div></ha-card>`;
     if (!this._events) {
       this.shadowRoot.addEventListener('click', e => {
@@ -80,21 +99,23 @@ class BolliAmbilightCard extends HTMLElement {
         if (a === 'mode') this._call('select','select_option',{entity_id:this._ids.mode,option:target.dataset.value});
         if (a === 'info') this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:target.dataset.id},bubbles:true,composed:true}));
       });
-      this.shadowRoot.addEventListener('input', e => {
-        if(e.target.dataset.slider)e.target.closest('.slider').querySelector('strong').textContent=e.target.value+' '+e.target.dataset.unit;
-      });
-      this.shadowRoot.addEventListener('change', e => {
+      this.shadowRoot.addEventListener('pointerdown',e=>{if(e.target.dataset.slider)this._drag=e.target.dataset.slider;});
+      this.shadowRoot.addEventListener('pointercancel',()=>{this._drag=null;this._update();});
+      this.shadowRoot.addEventListener('input',e=>{if(e.target.dataset.slider)e.target.closest('.slider').querySelector('strong').textContent=e.target.value+' '+e.target.dataset.unit;});
+      this.shadowRoot.addEventListener('change',e=>{
         const k=e.target.dataset.slider;
-        if(k) { const value=Number(e.target.value); e.target.blur(); this._call('number','set_value',{entity_id:this._ids[k],value}); }
-        if(e.target.dataset.toggle==='auto') this._call('switch',e.target.checked?'turn_on':'turn_off',{entity_id:this._ids.auto});
+        if(k){const value=Number(e.target.value);this._drag=null;this._pending.set(k,{value,until:Date.now()+5000});this._call('number','set_value',{entity_id:this._ids[k],value},k);}
+        const t=e.target.dataset.toggle;if(t)this._call('switch',e.target.checked?'turn_on':'turn_off',{entity_id:this._ids[t]});
+        const sel=e.target.dataset.select;if(sel)this._call('select','select_option',{entity_id:this._ids[sel],option:e.target.value});
       });
+      this.shadowRoot.addEventListener('pointerup',()=>{this._drag=null;});
       this._events = true;
     }
     this._update();
   }
-  async _call(domain,service,data){
-    try { await this._hass.callService(domain,service,data); }
-    catch(e) { this.dispatchEvent(new CustomEvent('hass-notification',{detail:{message:e?.message || String(e)},bubbles:true,composed:true})); }
+  async _call(domain,service,data,key){
+    try { this.shadowRoot.querySelector('.notice').textContent=''; await this._hass.callService(domain,service,data); }
+    catch(e) { if(key)this._pending.delete(key);this.shadowRoot.querySelector('.notice').textContent=e?.message||String(e);this._update();this.dispatchEvent(new CustomEvent('hass-notification',{detail:{message:e?.message || String(e)},bubbles:true,composed:true})); }
   }
   _slider(key,label,unit){
     if(!this._valid(key))return '';
@@ -118,15 +139,26 @@ class BolliAmbilightCard extends HTMLElement {
       const active=String(mode).toLowerCase()===name.toLowerCase();
       return `<button class="mode ${active?'selected':''}" data-action="mode" data-value="${bolliEscape(option||name)}" aria-pressed="${active}" ${!option||!this._valid('mode')?'disabled':''}><ha-icon icon="${icons[name.toLowerCase()]}"></ha-icon>${this._str(name.toLowerCase())}</button>`;
     }).join('');
-    const isRelax=String(mode).toLowerCase()==='relax';
-    const activeKey=isRelax?'relax':'cinema';
-    const isOff=String(mode).toLowerCase()==='off'||!on;
-    const controls=isOff?[]:[this._slider(activeKey,this._str('brightness'),'%')];
-    if(!isOff && isRelax)controls.push(this._slider('kelvin',this._str('temperature'),'K'));
-    if(!isOff && !isRelax)controls.push(this._slider('target',this._str('fps'),'FPS'));
-    if(!isOff && this._valid('auto'))controls.push(`<label class="toggle"><span>${this._str('ambient')}</span><input data-toggle="auto" type="checkbox" ${this._value('auto')==='on'?'checked':''} aria-label="${this._str('ambient')}"></label>`);
-    // Keep focused slider alive while HA reports unrelated state updates.
-    const box=q('.controls');if(!box.contains(this.shadowRoot.activeElement))box.innerHTML=controls.filter(Boolean).join('');
+    const toggle=(k,label)=>this._valid(k)?'<label class="toggle"><span>'+label+'</span><input type="checkbox" data-toggle="'+k+'" aria-label="'+label+'"></label>':'';
+    const select=(k,label)=>this._valid(k)?'<label class="selectrow">'+label+'<select data-select="'+k+'">'+(this._entity(k).attributes.options||[]).map(v=>'<option value="'+bolliEscape(v)+'">'+bolliEscape(v)+'</option>').join('')+'</select></label>':'';
+    const controls=['<div class="section">Cinema</div>',this._slider('cinema','Luminosità Cinema','%'),this._slider('target','FPS desiderati','FPS'),'<div class="section">Relax</div>',this._slider('relax','Luminosità Relax','%'),this._slider('kelvin','Temperatura colore','K'),'<div class="section">Ambiente</div>',toggle('auto','Luminosità adattiva')];
+    const calibration=[this._slider('gamma','Gamma',''),this._slider('saturation','Saturazione',''),this._slider('luminance','Luminanza',''),this._slider('threshold','Soglia retroilluminazione',''),toggle('smoothing','Smoothing'),toggle('border','Rilevamento bande nere'),select('hdr','HDR tone mapping'),select('priority','Sorgente')];
+    for(const [selector,items] of [['.controls',controls],['.calibration',calibration]]){
+      const box=q(selector),html=items.filter(Boolean).join('');
+      const signature=html.replace(/(<input[^>]*?) value="[^"]*"/g,'$1').replace(/<strong>.*?<\/strong>/g,'<strong></strong>');
+      if(box._signature!==signature&&!box.contains(this.shadowRoot.activeElement)&&!this._drag){box.innerHTML=html;box._signature=signature;}
+      for(const input of box.querySelectorAll('[data-slider]')){
+        const k=input.dataset.slider;if(this._drag===k||(this.shadowRoot.activeElement===input&&!this._pending.has(k)))continue;
+        const actual=Number(this._value(k)),pending=this._pending.get(k);
+        if(pending&&(actual===pending.value||Date.now()>pending.until))this._pending.delete(k);
+        const value=this._pending.get(k)?.value??actual;
+        if(Number.isFinite(value)){input.value=value;input.closest('.slider').querySelector('strong').textContent=value+' '+input.dataset.unit;}
+      }
+      for(const input of box.querySelectorAll('[data-toggle]'))input.checked=this._value(input.dataset.toggle)==='on';
+      for(const input of box.querySelectorAll('[data-select]'))if(this.shadowRoot.activeElement!==input)input.value=this._value(input.dataset.select);
+    }
+    q('.stats').innerHTML=[['FPS',this._value('fps')],['LED',this._value('leds')],['LUX',this._value('lux')]].map(([l,v])=>'<div class="stat"><b>'+bolliEscape(v??'—')+'</b><small>'+l+'</small></div>').join('');
+    q('.diagnostic').textContent='TV: '+(this._value('tv')??'—')+' · Sorgente: '+(this._value('source')??'—')+' · Target FPS: '+(this._value('target')??'—');
     const status=this._value('status')||this._str('missing');
     const fps=this._value('fps');
     q('.meta').innerHTML=`<span class="chip ${connected?'good':'bad'}"><ha-icon icon="${connected?'mdi:lan-connect':'mdi:lan-disconnect'}"></ha-icon>HyperHDR</span><span class="chip"><ha-icon icon="mdi:information-outline"></ha-icon>${bolliEscape(status)}</span>${fps!==null?`<span class="chip"><ha-icon icon="mdi:speedometer"></ha-icon>${bolliEscape(fps)} FPS</span>`:''}`;
