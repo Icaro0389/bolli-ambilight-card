@@ -1,5 +1,5 @@
-/* Bolli Ambilight Card — Home Assistant custom card, v0.2.0 */
-const BOLLI_VERSION = '0.2.0';
+/* Bolli Ambilight Card — Home Assistant custom card, v0.2.1 */
+const BOLLI_VERSION = '0.2.1';
 const BOLLI_DEFAULTS = {
   power: 'switch.bolli_ambilight_power', mode: 'select.bolli_ambilight_mode',
   status: 'sensor.bolli_ambilight_status', fps: 'sensor.bolli_ambilight_actual_fps',
@@ -87,6 +87,21 @@ class BolliAmbilightCard extends HTMLElement {
       details{border:1px solid var(--divider-color);border-radius:11px;padding:10px;background:color-mix(in srgb,var(--secondary-text-color) 4%,transparent)}summary{cursor:pointer;font-size:13px;font-weight:500}details .inside{display:grid;gap:10px;margin-top:12px}
       .toggle input{appearance:none;width:34px;height:19px;border-radius:20px;background:var(--disabled-color,#777);position:relative;cursor:pointer}.toggle input:checked{background:var(--bolli-accent)}.toggle input:before{content:'';position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:white}.toggle input:checked:before{left:18px}
       .toggle{font-size:12px}.selectrow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}.selectrow select{max-width:55%;background:var(--card-background-color);color:var(--primary-text-color);border:1px solid var(--divider-color);border-radius:6px;padding:5px}.notice{font-size:12px;color:var(--error-color);overflow-wrap:anywhere}.notice:empty{display:none}.diagnostic{font-size:12px;overflow-wrap:anywhere;color:var(--secondary-text-color)}
+    /* Keep expanded calibration controls inside the available card width. */
+      :host{min-width:0;max-width:100%}
+      *,*::before,*::after{box-sizing:border-box}
+      ha-card{width:100%;min-width:0;max-width:100%}
+      .wrap{width:100%;min-width:0;grid-template-columns:minmax(0,1fr)}
+      .wrap>*{min-width:0;max-width:100%}
+      .controls,details .inside,.slider{min-width:0;grid-template-columns:minmax(0,1fr)}
+      details,details .inside>*{min-width:0;max-width:100%}
+      .selectrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);overflow-wrap:anywhere}
+      .selectrow select{width:100%;min-width:0;max-width:100%;text-overflow:ellipsis}
+      .slider input[type=range]{display:block;min-width:0;max-width:100%}
+      .sliderline span,.toggle span{min-width:0;overflow-wrap:anywhere}
+      .sliderline strong,.toggle input{flex-shrink:0}
+      .preview img{min-width:0;max-width:100%}
+      .stat{min-width:0;overflow-wrap:anywhere}
     </style><ha-card><div class="wrap">
       <div class="head"><div class="glyph"><ha-icon icon="mdi:television-classic"></ha-icon></div><div class="heading"><div class="name"></div><div class="sub"></div></div><button class="power" data-action="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       <div class="preview"></div><div class="stats"></div><div class="modes"></div><div class="controls"></div><details><summary>Calibrazione HyperHDR</summary><div class="inside calibration"></div></details><details><summary>Diagnostica</summary><div class="inside diagnostic"></div></details><div class="notice" role="alert"></div><div class="meta line"></div>
