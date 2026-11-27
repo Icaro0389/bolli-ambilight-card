@@ -1,5 +1,5 @@
-/* Bolli Ambilight Card — Home Assistant custom card, v0.1.0 */
-const BOLLI_VERSION = '0.1.0';
+/* Bolli Ambilight Card — Home Assistant custom card, v0.1.1 */
+const BOLLI_VERSION = '0.1.1';
 const BOLLI_DEFAULTS = {
   power: 'switch.bolli_ambilight_power', mode: 'select.bolli_ambilight_mode',
   status: 'sensor.bolli_ambilight_status', fps: 'sensor.bolli_ambilight_actual_fps',
@@ -27,6 +27,8 @@ class BolliAmbilightCard extends HTMLElement {
     this._ids = Object.fromEntries(Object.keys(BOLLI_DEFAULTS).map(k => [k, this._config[`${k}_entity`] || BOLLI_DEFAULTS[k]]));
     this._build();
   }
+  connectedCallback(){ if(!this._cameraTimer)this._cameraTimer=setInterval(()=>this._updateCamera(),1000); }
+  disconnectedCallback(){clearInterval(this._cameraTimer);this._cameraTimer=null;}
   getCardSize() { return this._config?.show_preview ? 7 : 5; }
   getGridOptions() { return { columns:12, min_columns:6 }; }
   set hass(hass) {
@@ -63,7 +65,7 @@ class BolliAmbilightCard extends HTMLElement {
       .chip ha-icon{--mdc-icon-size:15px}.chip.good ha-icon{color:var(--success-color)}.chip.bad ha-icon{color:var(--error-color)}
       .toggle{display:flex;align-items:center;gap:10px;padding:3px 0;font-size:var(--ha-font-size-m,14px)}.toggle span{flex:1}.toggle input{accent-color:var(--bolli-accent);width:19px;height:19px}
       .preview{display:none;border-radius:var(--ha-border-radius-lg,12px);overflow:hidden;background:var(--secondary-background-color);min-height:90px;align-items:center;justify-content:center}
-      .preview img{display:block;width:100%;max-height:210px;object-fit:contain}.preview.show{display:flex}
+      .preview img{display:block;width:100%;max-height:210px;object-fit:contain}.preview.show{display:flex;aspect-ratio:16/9;background:#000}.preview.black img{visibility:hidden}
       @container(max-width:315px){.mode{font-size:11px}.wrap{padding:12px;gap:12px}.modes{gap:4px}}
       @media(prefers-reduced-motion:reduce){*{transition:none!important}}
     </style><ha-card><div class="wrap">
@@ -78,9 +80,12 @@ class BolliAmbilightCard extends HTMLElement {
         if (a === 'mode') this._call('select','select_option',{entity_id:this._ids.mode,option:target.dataset.value});
         if (a === 'info') this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:target.dataset.id},bubbles:true,composed:true}));
       });
+      this.shadowRoot.addEventListener('input', e => {
+        if(e.target.dataset.slider)e.target.closest('.slider').querySelector('strong').textContent=e.target.value+' '+e.target.dataset.unit;
+      });
       this.shadowRoot.addEventListener('change', e => {
         const k=e.target.dataset.slider;
-        if(k) this._call('number','set_value',{entity_id:this._ids[k],value:Number(e.target.value)});
+        if(k) { const value=Number(e.target.value); e.target.blur(); this._call('number','set_value',{entity_id:this._ids[k],value}); }
         if(e.target.dataset.toggle==='auto') this._call('switch',e.target.checked?'turn_on':'turn_off',{entity_id:this._ids.auto});
       });
       this._events = true;
@@ -97,14 +102,14 @@ class BolliAmbilightCard extends HTMLElement {
     const min=Number.isFinite(Number(a.min))?Number(a.min):0,max=Number.isFinite(Number(a.max))?Number(a.max):100;
     const step=Number.isFinite(Number(a.step))&&Number(a.step)>0?Number(a.step):1;
     const display=this._hass.formatEntityState?.(s) || `${val} ${unit}`;
-    return `<label class="slider"><div class="sliderline"><span>${bolliEscape(label)}</span><strong>${bolliEscape(display)}</strong></div><input type="range" data-slider="${key}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${bolliEscape(label)}"></label>`;
+    return `<label class="slider"><div class="sliderline"><span>${bolliEscape(label)}</span><strong>${bolliEscape(display)}</strong></div><input type="range" data-slider="${key}" data-unit="${unit}" min="${min}" max="${max}" step="${step}" value="${val}" aria-label="${bolliEscape(label)}"></label>`;
   }
   _update(){
     if(!this.shadowRoot.querySelector('.wrap') || !this._hass)return;
     const q=s=>this.shadowRoot.querySelector(s), connected=this._value('connected')==='on';
     const on=this._value('power')==='on', mode=this._value('mode') || 'Auto';
     q('.name').textContent=this._config.name;
-    q('.sub').textContent=connected?this._str('ready'):this._str('offline');
+    q('.sub').textContent=this._value('power')==='off'||String(mode).toLowerCase()==='off'?'Standby':connected?this._str('ready'):this._str('offline');
     const p=q('.power');p.classList.toggle('on',on);p.disabled=!this._valid('power');p.setAttribute('aria-pressed',String(on));
     const options=this._entity('mode')?.attributes.options || ['Auto','Cinema','Relax','Off'];
     const icons={auto:'mdi:autorenew',cinema:'mdi:movie-open',relax:'mdi:weather-sunset',off:'mdi:power-off'};
@@ -132,10 +137,15 @@ class BolliAmbilightCard extends HTMLElement {
   _updateCamera(){
     if(!this._config?.show_preview)return;
     const image=this.shadowRoot.querySelector('.preview img'), s=this._entity('camera');
-    if(!image || !s || !this._valid('camera'))return;
+    if(!image)return;
+    const off=this._value('power')==='off'||String(this._value('mode')).toLowerCase()==='off'||String(this._value('status')).toUpperCase()==='OFF';
+    const preview=image.parentElement;
+    preview.classList.toggle('black',off||!s||!this._valid('camera'));
+    if(off||!s||!this._valid('camera')){image.removeAttribute('src');this._cameraLast=0;return;}
+    if(document.hidden||!this.isConnected||Date.now()-(this._cameraLast||0)<950)return;
     const token=s.attributes.access_token;
     const path=s.attributes.entity_picture || (token?`/api/camera_proxy/${this._ids.camera}?token=${encodeURIComponent(token)}`:null);
-    if(path){const url=this._hass.hassUrl?.(path) || path; if(image.src!==url)image.src=url;}
+    if(path){const url=this._hass.hassUrl?.(path) || path; this._cameraLast=Date.now();image.src=url+(url.includes('?')?'&':'?')+'_bolli='+this._cameraLast;}
   }
 }
 
